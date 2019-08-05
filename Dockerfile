@@ -1,7 +1,18 @@
-FROM alpine:latest
+# build stage
+FROM golang:latest AS build-env
 
-RUN apk upgrade --no-cache \
-    && apk add --no-cache --virtual .build-deps curl
+ENV GO111MODULE auto
+ENV CGO_ENABLED 0
 
-CMD curl -X POST -H 'Content-type: application/json' --data '{"text":"test"}' ${WEBHOOK_URL}
+ADD . /src
+WORKDIR /src
+RUN go build -o docker-slack *.go
 
+# final stage
+FROM alpine
+
+RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
+
+WORKDIR /app
+COPY --from=build-env /src/docker-slack /app/
+ENTRYPOINT ./docker-slack
